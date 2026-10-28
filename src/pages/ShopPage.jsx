@@ -7,7 +7,7 @@ import ProductGrid from "../components/ProductGrid";
 const PAGE_SIZE = 8;
 
 export default function ShopPage() {
-  const { products, loading, error } = useProducts();
+  const { products, loading, error, catalogNotice } = useProducts();
   const [params, setParams] = useSearchParams();
   const [visible, setVisible] = useState(PAGE_SIZE);
   const [mobileFilters, setMobileFilters] = useState(false);
@@ -65,31 +65,54 @@ export default function ShopPage() {
   };
 
   return (
-    <div className="container page-wrap">
-      <div className="shop-heading"><div><span className="eyebrow">THE COMPONENT COLLECTION</span><h1>{category || (featuredOnly ? "Featured gear" : "Find your next part")}</h1><p>PC parts and peripherals for every kind of setup.</p></div><div className="catalog-count">{products.length}<small>CURATED PARTS</small></div></div>
-      <div className="shop-toolbar">
-        <div className="shop-search"><Search size={17} /><input placeholder="Search name, brand, or SKU" value={search} onChange={(event) => { setSearch(event.target.value); setVisible(PAGE_SIZE); }} /><span>⌘ K</span></div>
-        <div className="shop-toolbar-actions"><button className="button button-outline filter-toggle" onClick={() => setMobileFilters(!mobileFilters)}><SlidersHorizontal size={16} /> Filters</button><label className="sort-control">Sort by <select value={sort} onChange={(event) => setSort(event.target.value)}><option value="newest">Newest</option><option value="price-low">Price: low to high</option><option value="price-high">Price: high to low</option><option value="name">Name: A to Z</option></select></label></div>
+    <div className="container page-wrap shop-page">
+      <section className="shop-spotlight">
+        <div className="shop-spotlight-copy">
+          <span className="shop-spotlight-kicker">Moto Depot <i /> Gear for the long way</span>
+          <h1>{category || (featuredOnly ? "Rider picks" : "Gear up for the ride")}</h1>
+          <p>Thoughtful motorcycle essentials for everyday commutes, weekend escapes, and every road in between.</p>
+          <div className="shop-spotlight-note"><span>{String(products.length).padStart(2, "0")}</span> ride-ready essentials in the collection</div>
+        </div>
+        <div className="shop-spotlight-photo" role="img" aria-label="Motorcycle ready for an open-road ride">
+          <span>Ride / Explore / Repeat</span>
+        </div>
+      </section>
+
+      <div className="shop-category-rail" aria-label="Shop by category">
+        <button className={!category ? "active" : ""} aria-pressed={!category} onClick={() => updateCategory("")}>All gear</button>
+        {categories.map((item) => (
+          <button key={item} className={category === item ? "active" : ""} aria-pressed={category === item} onClick={() => updateCategory(item)}>{item}</button>
+        ))}
       </div>
-      <div className="catalog-layout">
-        <aside className={`filter-panel ${mobileFilters ? "filter-panel-open" : ""}`}>
-          <div className="filter-title"><h3><Filter size={16} /> Filters</h3><button onClick={reset}><RotateCcw size={13} /> Clear</button></div>
+
+      <div className="shop-toolbar">
+        <label className="shop-search"><Search size={17} /><input aria-label="Search gear, brand, or SKU" placeholder="Search gear, brand, or SKU" value={search} onChange={(event) => { setSearch(event.target.value); setVisible(PAGE_SIZE); }} /><span>FIND</span></label>
+        <div className="shop-toolbar-actions">
+          <button className="button button-outline filter-toggle" onClick={() => setMobileFilters(!mobileFilters)} aria-expanded={mobileFilters}><SlidersHorizontal size={16} /> Filters</button>
+          <label className="sort-control">Sort by <select value={sort} onChange={(event) => setSort(event.target.value)}><option value="newest">Newest</option><option value="price-low">Price: low to high</option><option value="price-high">Price: high to low</option><option value="name">Name: A to Z</option></select></label>
+        </div>
+      </div>
+
+      <div className="shop-catalog-layout">
+        <aside className={`shop-filter-panel ${mobileFilters ? "shop-filter-panel-open" : ""}`}>
+          <div className="shop-filter-heading"><div><span>REFINE YOUR SEARCH</span><h2><Filter size={16} /> Filters</h2></div><button onClick={reset}><RotateCcw size={13} /> Clear</button></div>
           <label className="field-label">Category<select value={category} onChange={(event) => updateCategory(event.target.value)}><option value="">All categories</option>{categories.map((item) => <option key={item}>{item}</option>)}</select></label>
           <label className="field-label">Brand<select value={brand} onChange={(event) => setBrand(event.target.value)}><option value="">All brands</option>{brands.map((item) => <option key={item}>{item}</option>)}</select></label>
           <div className="field-label">Price range <div className="price-inputs"><input type="number" min="0" placeholder="Min ₱" value={min} onChange={(event) => setMin(event.target.value)} /><input type="number" min="0" placeholder="Max ₱" value={max} onChange={(event) => setMax(event.target.value)} /></div></div>
           <label className="check-label"><input type="checkbox" checked={inStock} onChange={(event) => setInStock(event.target.checked)} /><span>In stock only</span></label>
           <button className="button button-outline clear-mobile" onClick={reset}>Clear all filters</button>
         </aside>
-        <div className="catalog-results">
-          <div className="results-meta"><span><b>{results.length}</b> {results.length === 1 ? "part" : "parts"} found</span>{(category || brand || search || min || max || inStock || featuredOnly) && <button onClick={reset}>Clear filters <XIcon /></button>}</div>
+        <div className="shop-catalog-results">
+          <div className="results-meta"><span><b>{results.length}</b> {results.length === 1 ? "item" : "items"} found</span>{(category || brand || search || min || max || inStock || featuredOnly) && <button onClick={reset}>Clear filters <XIcon /></button>}</div>
           <ProductGrid
             products={results.slice(0, visible)}
             loading={loading}
             error={error}
-            emptyTitle={category || brand || search || min || max || inStock || featuredOnly ? "No parts match those filters" : "The catalog is empty"}
-            emptyMessage={category || brand || search || min || max || inStock || featuredOnly ? "Try a different search or clear some filters." : "Seed the demo products or publish catalog items in the admin dashboard."}
+            notice={catalogNotice}
+            emptyTitle={category || brand || search || min || max || inStock || featuredOnly ? "No gear matches those filters" : "The collection is getting ready"}
+            emptyMessage={category || brand || search || min || max || inStock || featuredOnly ? "Try a different search or clear some filters." : "Add products in the Moto Depot admin dashboard."}
           />
-          {!loading && !error && results.length > visible && <div className="load-more"><button className="button button-outline" onClick={() => setVisible((count) => count + PAGE_SIZE)}>Load more parts <span>({results.length - visible} remaining)</span></button></div>}
+          {!loading && !error && results.length > visible && <div className="load-more"><button className="button button-outline" onClick={() => setVisible((count) => count + PAGE_SIZE)}>Load more gear <span>({results.length - visible} remaining)</span></button></div>}
         </div>
       </div>
     </div>

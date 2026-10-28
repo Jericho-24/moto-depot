@@ -10,6 +10,7 @@ import {
   serverTimestamp,
   setDoc,
   updateDoc,
+  writeBatch,
 } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import {
@@ -54,6 +55,7 @@ import { db, storage } from "../firebase/client";
 import { EmptyState, ErrorState, LoadingState } from "../components/Feedback";
 import ProductImage from "../components/ProductImage";
 import { errorMessage, formatDate, formatPrice } from "../utils/format";
+import catalogProducts from "../../data/products.json";
 
 const STATUSES = ["Pending", "Confirmed", "Processing", "Shipped", "Delivered", "Cancelled"];
 const STATUS_NEXT = {
@@ -65,6 +67,9 @@ const STATUS_NEXT = {
   Cancelled: [],
 };
 const CHART_COLORS = ["#37d5f2", "#2a91ff", "#7869f7", "#58d2a3", "#f0ac55", "#f47575"];
+const fallbackProducts = new Map(catalogProducts.map((product) => [product.id, product]));
+const fallbackProductIds = new Set(fallbackProducts.keys());
+const bundledProductImages = new Map(catalogProducts.map((product) => [product.id, product.image]));
 
 export function AdminLayout() {
   const { user, logout } = useAuth();
@@ -73,8 +78,8 @@ export function AdminLayout() {
   return (
     <div className="admin-layout">
       <aside className="admin-sidebar">
-        <Link to="/" className="brand-lockup admin-brand"><span className="brand-mark">N</span><span className="brand-name">NEXUS<span>PC</span><small>ADMIN CONSOLE</small></span></Link>
-        <div className="admin-workspace"><span className="workspace-avatar">N</span><span><b>NEXUS PC</b><small>Store workspace</small></span><ChevronDown size={14} /></div>
+        <Link to="/" className="brand-lockup admin-brand"><span className="brand-mark">M</span><span className="brand-name">MOTO<span>DEPOT</span><small>ADMIN CONSOLE</small></span></Link>
+        <div className="admin-workspace"><span className="workspace-avatar">M</span><span><b>Moto Depot</b><small>Rider gear store</small></span><ChevronDown size={14} /></div>
         <span className="admin-nav-label">WORKSPACE</span>
         <NavLink end to="/admin" className="admin-nav-link"><LayoutDashboard size={17} /> Overview</NavLink>
         <NavLink to="/admin/products" className="admin-nav-link"><Package size={17} /> Products</NavLink>
@@ -124,7 +129,7 @@ export function AdminDashboardPage() {
       <div className="metric-grid">{metrics.map(({ title, value, icon: Icon, note }) => <div className="metric-card" key={title}><div className="metric-card-top"><span>{title}</span><Icon size={18} /></div><strong>{value}</strong><small>{note}</small></div>)}</div>
       <div className="admin-dashboard-grid">
         <section className="admin-panel sales-panel"><div className="panel-heading"><div><span className="eyebrow">LAST 6 MONTHS</span><h2>Sales overview</h2></div><span className="chart-legend"><i /> Gross order total</span></div><div className="sales-chart"><ResponsiveContainer width="100%" height="100%"><AreaChart data={monthlySales} margin={{ left: -18, right: 8, top: 14, bottom: 0 }}><defs><linearGradient id="salesFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#33d6f2" stopOpacity={0.3} /><stop offset="95%" stopColor="#33d6f2" stopOpacity={0} /></linearGradient></defs><CartesianGrid stroke="#202b37" vertical={false} /><XAxis dataKey="month" stroke="#718094" tickLine={false} axisLine={false} tick={{ fontSize: 11 }} /><YAxis stroke="#718094" tickLine={false} axisLine={false} tick={{ fontSize: 10 }} tickFormatter={(value) => value >= 1000 ? `₱${(value / 1000).toFixed(0)}k` : `₱${value}`} /><Tooltip content={<SalesTooltip />} /><Area type="monotone" dataKey="revenue" stroke="#33d6f2" strokeWidth={2} fill="url(#salesFill)" activeDot={{ r: 5, fill: "#33d6f2" }} /></AreaChart></ResponsiveContainer></div><p className="chart-definition">Revenue is gross order total (including shipping) from all non-cancelled orders, based on the server-calculated order total.</p></section>
-        <section className="admin-panel"><div className="panel-heading"><div><span className="eyebrow">NEEDS ATTENTION</span><h2>Low stock</h2></div><Link to="/admin/products">Manage <ArrowUpRight size={14} /></Link></div>{lowStock.length ? <div className="low-stock-list">{lowStock.slice(0, 5).map((product) => <Link key={product.id} to="/admin/products" className="low-stock-row"><ProductImage src={product.image} alt="" /><span><b>{product.name}</b><small>{product.brand}</small></span><em>{product.stock} left</em></Link>)}</div> : <div className="admin-empty-small"><Check size={17} /> No low-stock products</div>}</section>
+        <section className="admin-panel"><div className="panel-heading"><div><span className="eyebrow">NEEDS ATTENTION</span><h2>Low stock</h2></div><Link to="/admin/products">Manage <ArrowUpRight size={14} /></Link></div>{lowStock.length ? <div className="low-stock-list">{lowStock.slice(0, 5).map((product) => <Link key={product.id} to="/admin/products" className="low-stock-row"><ProductImage id={product.id} src={product.image} alt="" /><span><b>{product.name}</b><small>{product.brand}</small></span><em>{product.stock} left</em></Link>)}</div> : <div className="admin-empty-small"><Check size={17} /> No low-stock products</div>}</section>
       </div>
       <section className="admin-panel recent-orders-panel"><div className="panel-heading"><div><span className="eyebrow">LATEST ACTIVITY</span><h2>Recent orders</h2></div><Link to="/admin/orders">All orders <ArrowUpRight size={14} /></Link></div>{recentOrders.length ? <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>ORDER</th><th>CUSTOMER</th><th>DATE</th><th>STATUS</th><th className="text-right">TOTAL</th></tr></thead><tbody>{recentOrders.map((order) => <tr key={order.id}><td><b>{order.orderNumber}</b></td><td>{order.customer?.name || "—"}</td><td>{formatDate(order.createdAt)}</td><td><span className={`status-pill status-${order.status?.toLowerCase()}`}>{order.status}</span></td><td className="text-right">{formatPrice(order.total)}</td></tr>)}</tbody></table></div> : <EmptyState title="No orders yet" message="New orders will show up here." />}</section>
     </div>
@@ -307,8 +312,10 @@ export function AdminOrdersPage() {
         const productSnapshots = await Promise.all(productRefs.map((productRef) => transaction.get(productRef)));
         let subtotal = 0;
         const orderItems = requestedItems.map((item, index) => {
-          const product = productSnapshots[index].data();
-          if (!productSnapshots[index].exists || !product || product.published !== true) {
+          const product = productSnapshots[index].exists
+            ? productSnapshots[index].data()
+            : fallbackProducts.get(item.productId);
+          if (!product || product.published !== true) {
             throw new Error("A requested product is no longer available.");
           }
           if (!Number.isSafeInteger(product.price) || product.price < 0
@@ -341,12 +348,23 @@ export function AdminOrdersPage() {
         const shippingAddress = orderRequest.shippingAddress || {};
 
         productRefs.forEach((productRef, index) => {
-          const product = productSnapshots[index].data();
-          transaction.update(productRef, {
-            stock: product.stock - requestedItems[index].quantity,
-            soldCount: Number(product.soldCount || 0) + requestedItems[index].quantity,
-            updatedAt: serverTimestamp(),
-          });
+          const quantity = requestedItems[index].quantity;
+          const product = productSnapshots[index].data() || fallbackProducts.get(requestedItems[index].productId);
+          if (productSnapshots[index].exists) {
+            transaction.update(productRef, {
+              stock: product.stock - quantity,
+              soldCount: Number(product.soldCount || 0) + quantity,
+              updatedAt: serverTimestamp(),
+            });
+          } else {
+            transaction.set(productRef, {
+              ...product,
+              stock: product.stock - quantity,
+              soldCount: quantity,
+              createdAt: serverTimestamp(),
+              updatedAt: serverTimestamp(),
+            });
+          }
         });
         transaction.set(orderRef, {
           uid: orderRequest.uid,
@@ -408,7 +426,7 @@ export function AdminOrdersPage() {
 }
 
 const EMPTY_FORM = {
-  name: "", category: "Processors", brand: "", price: "", sku: "", stock: "",
+  name: "", category: "Helmets", brand: "", price: "", sku: "", stock: "",
   description: "", image: "", specifications: "{\n  \"Specification\": \"Value\"\n}",
   featured: false, published: true,
 };
@@ -418,6 +436,7 @@ export function AdminProductsPage() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [catalogNotice, setCatalogNotice] = useState("");
   const [search, setSearch] = useState("");
   const [editing, setEditing] = useState(null);
   const [editorOpen, setEditorOpen] = useState(false);
@@ -427,9 +446,25 @@ export function AdminProductsPage() {
 
   const reload = () => {
     setLoading(true);
+    setError("");
     getDocs(query(collection(db, "products"), orderBy("name", "asc")))
-      .then((snapshot) => setProducts(snapshot.docs.map((entry) => ({ id: entry.id, ...entry.data() }))))
-      .catch((issue) => setError(issue.message || "Could not load products."))
+      .then((snapshot) => {
+        const merged = new Map(catalogProducts.map((product) => [product.id, { ...product, localOnly: true }]));
+        snapshot.docs.forEach((entry) => merged.set(entry.id, { id: entry.id, ...entry.data(), localOnly: false }));
+        const loadedProducts = [...merged.values()].sort((a, b) => a.name.localeCompare(b.name));
+        setProducts(loadedProducts);
+        setCatalogNotice(snapshot.empty
+          ? "Showing the bundled catalog. Product edits are saved to Firestore."
+          : loadedProducts.some((product) => product.localOnly)
+            ? "Bundled catalog products are shown alongside Firestore products. Edits are saved to Firestore."
+            : "");
+      })
+      .catch((issue) => {
+        console.error("Could not load Firestore products; showing the bundled catalog.", issue);
+        setProducts(catalogProducts.map((product) => ({ ...product, localOnly: true })));
+        setCatalogNotice("Firestore products could not be loaded. Showing the bundled catalog; edits require a working Firestore connection.");
+        setError("");
+      })
       .finally(() => setLoading(false));
   };
   useEffect(reload, []);
@@ -441,7 +476,7 @@ export function AdminProductsPage() {
     setImageFile(null);
     setForm({
       name: product.name || "",
-      category: product.category || "Processors",
+      category: product.category || "Helmets",
       brand: product.brand || "",
       price: product.price ?? "",
       sku: product.sku || "",
@@ -496,6 +531,7 @@ export function AdminProductsPage() {
         specifications,
         featured: form.featured,
         published: form.published,
+        soldCount: Number(existing?.soldCount || 0),
         createdAt: existing?.createdAt || serverTimestamp(),
         updatedAt: serverTimestamp(),
       };
@@ -517,6 +553,10 @@ export function AdminProductsPage() {
   };
 
   const removeProduct = async (product) => {
+    if (fallbackProductIds.has(product.id)) {
+      toast("Bundled catalog products cannot be deleted. Unpublish the product instead.", "error");
+      return;
+    }
     if (!window.confirm(`Delete "${product.name}" from the catalog?`)) return;
     try {
       await deleteDoc(doc(db, "products", product.id));
@@ -527,14 +567,77 @@ export function AdminProductsPage() {
     }
   };
 
+  const importBundledProducts = async () => {
+    const missingProducts = products.filter((product) => product.localOnly);
+    if (!missingProducts.length) return;
+    setBusy(true);
+    try {
+      for (let start = 0; start < missingProducts.length; start += 450) {
+        const batch = writeBatch(db);
+        missingProducts.slice(start, start + 450).forEach((product) => {
+          const { localOnly, ...catalogProduct } = product;
+          batch.set(doc(db, "products", product.id), {
+            ...catalogProduct,
+            soldCount: Number(product.soldCount || 0),
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          });
+        });
+        await batch.commit();
+      }
+      toast(`${missingProducts.length} bundled products added to Firestore.`);
+      reload();
+    } catch (issue) {
+      toast(errorMessage(issue), "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const updateBundledPhotos = async () => {
+    const productsToUpdate = products.filter((product) => (
+      !product.localOnly
+      && bundledProductImages.has(product.id)
+      && product.image !== bundledProductImages.get(product.id)
+    ));
+    if (!productsToUpdate.length) return;
+    setBusy(true);
+    try {
+      for (let start = 0; start < productsToUpdate.length; start += 450) {
+        const batch = writeBatch(db);
+        productsToUpdate.slice(start, start + 450).forEach((product) => {
+          batch.update(doc(db, "products", product.id), {
+            image: bundledProductImages.get(product.id),
+            updatedAt: serverTimestamp(),
+          });
+        });
+        await batch.commit();
+      }
+      toast(`${productsToUpdate.length} catalog photos updated in Firestore.`);
+      reload();
+    } catch (issue) {
+      toast(errorMessage(issue), "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const missingProductCount = products.filter((product) => product.localOnly).length;
+  const photosNeedingUpdate = products.filter((product) => (
+    !product.localOnly
+    && bundledProductImages.has(product.id)
+    && product.image !== bundledProductImages.get(product.id)
+  )).length;
+
   return (
     <div className="admin-page">
-      <div className="admin-page-heading"><div><span className="eyebrow">CATALOG MANAGEMENT</span><h1>Products</h1><p>Add, update, and curate the parts in your storefront.</p></div><button className="button button-primary" onClick={startCreate}><Plus size={16} /> Add product</button></div>
+      <div className="admin-page-heading"><div><span className="eyebrow">CATALOG MANAGEMENT</span><h1>Products</h1><p>Add, update, and curate the parts in your storefront.</p></div><div className="flex flex-wrap gap-2"><button className="button button-outline" onClick={importBundledProducts} disabled={busy || !missingProductCount}>{busy ? "Working…" : `Add ${missingProductCount} bundled products to Firestore`}</button><button className="button button-outline" onClick={updateBundledPhotos} disabled={busy || !photosNeedingUpdate}>{busy ? "Working…" : `Update ${photosNeedingUpdate} product photos`}</button><button className="button button-primary" onClick={startCreate}><Plus size={16} /> Add product</button></div></div>
       <div className="admin-product-toolbar"><div className="admin-search"><Search size={16} /><input placeholder="Find a product" value={search} onChange={(event) => setSearch(event.target.value)} /></div><span>{products.length} catalog products</span></div>
+      {catalogNotice && <div className="catalog-notice" role="status">{catalogNotice}</div>}
       {editorOpen ? <section className="admin-panel product-editor"><div className="panel-heading"><div><span className="eyebrow">{editing ? "EDIT CATALOG ITEM" : "NEW CATALOG ITEM"}</span><h2>{editing ? "Product details" : "Add a product"}</h2></div><button className="admin-close" onClick={() => setEditorOpen(false)} aria-label="Close editor"><X size={18} /></button></div><form onSubmit={save} className="product-editor-form">
         <label className="field-label">Product name<input name="name" value={form.name} onChange={change} required maxLength={140} /></label>
         <label className="field-label">Brand<input name="brand" value={form.brand} onChange={change} required /></label>
-        <label className="field-label">Category<select name="category" value={form.category} onChange={change}>{["Processors", "Graphics Cards", "Motherboards", "Memory", "Storage", "Power Supplies", "Cases", "Cooling", "Peripherals"].map((item) => <option key={item}>{item}</option>)}</select></label>
+        <label className="field-label">Category<select name="category" value={form.category} onChange={change}>{["Helmets", "Riding Jackets", "Gloves", "Luggage", "Protection", "Lighting", "Maintenance", "Electronics", "Accessories"].map((item) => <option key={item}>{item}</option>)}</select></label>
         <label className="field-label">SKU<input name="sku" value={form.sku} onChange={change} required /></label>
         <label className="field-label">Price (PHP)<input name="price" type="number" min="0" step="1" value={form.price} onChange={change} required /></label>
         <label className="field-label">Stock quantity<input name="stock" type="number" min="0" step="1" value={form.stock} onChange={change} required /></label>
@@ -546,7 +649,7 @@ export function AdminProductsPage() {
         <div className="product-editor-actions"><button type="button" className="button button-outline" onClick={() => setEditorOpen(false)}>Cancel</button><button type="submit" className="button button-primary" disabled={busy}>{busy ? "Saving…" : editing ? "Save changes" : "Add product"} <Check size={15} /></button></div>
       </form></section> : <></>}
       <section className="admin-panel admin-products-list">
-        {loading ? <LoadingState label="Loading products..." /> : error ? <ErrorState message={error} onRetry={reload} /> : !filtered.length ? <EmptyState title="No products found" message="Try another search or add your first catalog item." /> : <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>PRODUCT</th><th>SKU</th><th>PRICE</th><th>STOCK</th><th>VISIBILITY</th><th></th></tr></thead><tbody>{filtered.map((product) => <tr key={product.id}><td><div className="admin-product-cell"><ProductImage src={product.image} alt="" /><span><b>{product.name}</b><small>{product.brand} · {product.category}</small></span></div></td><td>{product.sku}</td><td>{formatPrice(product.price)}</td><td><span className={product.stock < 6 ? "stock-low" : ""}>{product.stock}</span></td><td><span className={`status-pill ${product.published ? "status-published" : "status-draft"}`}>{product.published ? "Published" : "Draft"}</span></td><td><div className="table-actions"><button onClick={() => startEdit(product)}>Edit</button><button onClick={() => removeProduct(product)} aria-label={`Delete ${product.name}`}><Trash2 size={15} /></button></div></td></tr>)}</tbody></table></div>}
+        {loading ? <LoadingState label="Loading products..." /> : error ? <ErrorState message={error} onRetry={reload} /> : !filtered.length ? <EmptyState title="No products found" message="Try another search or add your first catalog item." /> : <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>PRODUCT</th><th>SKU</th><th>PRICE</th><th>STOCK</th><th>VISIBILITY</th><th></th></tr></thead><tbody>{filtered.map((product) => <tr key={product.id}><td><div className="admin-product-cell"><ProductImage id={product.id} src={product.image} alt="" /><span><b>{product.name}</b><small>{product.brand} · {product.category}{product.localOnly ? " · Bundled catalog" : ""}</small></span></div></td><td>{product.sku}</td><td>{formatPrice(product.price)}</td><td><span className={product.stock < 6 ? "stock-low" : ""}>{product.stock}</span></td><td><span className={`status-pill ${product.published ? "status-published" : "status-draft"}`}>{product.published ? "Published" : "Draft"}</span></td><td><div className="table-actions"><button onClick={() => startEdit(product)}>Edit</button>{fallbackProductIds.has(product.id) ? <button disabled aria-label={`Cannot delete bundled catalog product ${product.name}`} title="Unpublish bundled products instead"><Trash2 size={15} /></button> : <button onClick={() => removeProduct(product)} aria-label={`Delete ${product.name}`}><Trash2 size={15} /></button>}</div></td></tr>)}</tbody></table></div>}
       </section>
       <p className="analytics-footnote"><ShieldCheck size={14} /> Product changes require the configured administrator account.</p>
     </div>

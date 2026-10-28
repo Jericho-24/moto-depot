@@ -9,13 +9,15 @@ import {
   setDoc,
   where,
 } from "firebase/firestore";
+import catalogProducts from "../../data/products.json";
 import { db, firebaseConfigured } from "../firebase/client";
 import { useAuth } from "./AuthContext";
 
 const ProductContext = createContext(null);
 const CartContext = createContext(null);
 const ToastContext = createContext(null);
-const CART_KEY = "nexus-pc-cart";
+const CART_KEY = "moto-depot-cart";
+const localProducts = catalogProducts.filter((product) => product.published);
 
 function readGuestCart() {
   try {
@@ -26,27 +28,42 @@ function readGuestCart() {
 }
 
 export function ProductProvider({ children }) {
-  const [products, setProducts] = useState([]);
+  const [products, setProducts] = useState(() => (
+    firebaseConfigured ? [] : localProducts
+  ));
   const [loading, setLoading] = useState(firebaseConfigured);
   const [error, setError] = useState("");
+  const [catalogNotice, setCatalogNotice] = useState(
+    firebaseConfigured ? "" : "Showing the included catalog because Firebase is not configured.",
+  );
 
   useEffect(() => {
     if (!firebaseConfigured) return undefined;
     return onSnapshot(
       query(collection(db, "products"), where("published", "==", true)),
       (snapshot) => {
-        setProducts(snapshot.docs.map((product) => ({ id: product.id, ...product.data() })));
+        const firestoreProducts = snapshot.docs.map((product) => ({ id: product.id, ...product.data() }));
+        if (firestoreProducts.length) {
+          setProducts(firestoreProducts);
+          setCatalogNotice("");
+        } else {
+          setProducts(localProducts);
+          setCatalogNotice("Showing the included catalog because no published products were found in Firebase.");
+        }
         setError("");
         setLoading(false);
       },
       (snapshotError) => {
-        setError(snapshotError.message || "Could not load the product catalog.");
+        console.error("Could not load the Firebase product catalog.", snapshotError);
+        setProducts((current) => current.length ? current : localProducts);
+        setCatalogNotice("Firebase products could not be loaded. Showing the included catalog instead.");
+        setError("");
         setLoading(false);
       },
     );
   }, []);
 
-  const value = useMemo(() => ({ products, loading, error }), [products, loading, error]);
+  const value = useMemo(() => ({ products, loading, error, catalogNotice }), [products, loading, error, catalogNotice]);
   return <ProductContext.Provider value={value}>{children}</ProductContext.Provider>;
 }
 

@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { ChevronDown, Menu, Search, ShoppingBag, UserRound, X, Zap } from "lucide-react";
+import { Bike, ChevronDown, Menu, Search, ShoppingBag, UserRound, X } from "lucide-react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useCart } from "../context/StoreContext";
 
-const categories = ["Processors", "Graphics Cards", "Motherboards", "Memory", "Storage", "Power Supplies", "Cases", "Cooling", "Peripherals"];
+const categories = ["Helmets", "Riding Jackets", "Gloves", "Luggage", "Protection", "Lighting", "Maintenance", "Electronics", "Accessories"];
 
 export default function Header() {
   const { user, isAdmin, logout } = useAuth();
@@ -26,14 +26,14 @@ export default function Header() {
           <button className="mobile-menu icon-button" onClick={() => setMenuOpen(!menuOpen)} aria-label="Toggle navigation">
             {menuOpen ? <X size={21} /> : <Menu size={21} />}
           </button>
-          <Link to="/" className="brand-lockup" aria-label="NEXUS PC home">
-            <span className="brand-mark"><Zap size={19} fill="currentColor" /></span>
-            <span className="brand-name">NEXUS<span>PC</span><small>POWER YOUR NEXT BUILD</small></span>
+          <Link to="/" className="brand-lockup" aria-label="Moto Depot home">
+            <span className="brand-mark"><Bike size={21} /></span>
+            <span className="brand-name">MOTO<span>DEPOT</span><small>GEAR FOR THE LONG WAY</small></span>
           </Link>
 
           <form className="header-search" onSubmit={submitSearch}>
             <Search size={18} />
-            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search parts, brands, or SKU..." />
+            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search helmets, gear, or brands..." />
             <button type="submit">Search</button>
           </form>
 
@@ -56,7 +56,7 @@ export default function Header() {
                 {category}
               </NavLink>
             ))}
-            <NavLink to="/shop?featured=true" className="nav-deals" onClick={() => setMenuOpen(false)}>Featured <span>↗</span></NavLink>
+            <NavLink to="/shop?featured=true" className="nav-deals" onClick={() => setMenuOpen(false)}>Rider picks <span>↗</span></NavLink>
             {user && (
               <div className="mobile-account-links">
                 <NavLink to="/account/orders" onClick={() => setMenuOpen(false)}>My orders</NavLink>

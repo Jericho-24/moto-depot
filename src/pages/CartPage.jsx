@@ -15,16 +15,16 @@ export default function CartPage() {
   const shipping = subtotal >= FREE_SHIPPING || subtotal === 0 ? 0 : SHIPPING_FEE;
 
   if (loading) return <div className="container page-wrap"><LoadingState label="Loading your cart..." /></div>;
-  if (count === 0) return <div className="container page-wrap"><div className="page-title"><span className="eyebrow">YOUR BUILD LIST</span><h1>Your cart</h1></div><EmptyState title="Your cart is waiting for its first part" message="Explore the catalog and start planning your next setup." /><Link to="/shop" className="button button-primary mx-auto mt-5 w-fit"><ShoppingBag size={17} /> Browse components</Link></div>;
+  if (count === 0) return <div className="container page-wrap"><div className="page-title"><span className="eyebrow">YOUR RIDE KIT</span><h1>Your cart</h1></div><EmptyState title="Your ride kit is still empty" message="Browse the collection and pick up a few essentials for the road." /><Link to="/shop" className="button button-primary mx-auto mt-5 w-fit"><ShoppingBag size={17} /> Browse motorcycle gear</Link></div>;
 
   return (
     <div className="container page-wrap">
-      <div className="page-title"><span className="eyebrow">YOUR BUILD LIST</span><h1>Your cart <small>({count} {count === 1 ? "item" : "items"})</small></h1></div>
+      <div className="page-title"><span className="eyebrow">YOUR RIDE KIT</span><h1>Your cart <small>({count} {count === 1 ? "item" : "items"})</small></h1></div>
       <div className="cart-layout">
         <div className="cart-list">
           {lines.map(({ product, quantity }) => (
             <article key={product.id} className="cart-line">
-              <Link to={`/product/${product.slug}`} className="cart-thumb"><ProductImage src={product.image} alt={product.name} /></Link>
+              <Link to={`/product/${product.slug}`} className="cart-thumb"><ProductImage id={product.id} src={product.image} alt={product.name} /></Link>
               <div className="cart-line-info"><span className="eyebrow">{product.brand} / {product.category}</span><Link to={`/product/${product.slug}`} className="cart-line-name">{product.name}</Link><span className="cart-sku">SKU {product.sku}</span><span className={`cart-availability ${quantity > product.stock ? "text-red-400" : ""}`}>{product.stock ? `${product.stock} in stock` : "Unavailable"}</span></div>
               <div className="quantity-control"><button aria-label="Decrease quantity" onClick={() => setQuantity(product.id, quantity - 1)}><Minus size={13} /></button><span>{quantity}</span><button aria-label="Increase quantity" disabled={quantity >= product.stock || quantity >= 10} onClick={() => setQuantity(product.id, quantity + 1)}><Plus size={13} /></button></div>
               <div className="cart-line-price"><b>{formatPrice(product.price * quantity)}</b><small>{formatPrice(product.price)} each</small></div>

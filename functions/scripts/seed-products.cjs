@@ -1,7 +1,10 @@
 const admin = require("firebase-admin");
 const products = require("../../data/products.json");
 
-admin.initializeApp({ credential: admin.credential.applicationDefault() });
+admin.initializeApp({
+  credential: admin.credential.applicationDefault(),
+  projectId: "moto-depot",
+});
 
 async function seedProducts() {
   const db = admin.firestore();

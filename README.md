@@ -1,124 +1,84 @@
-# NEXUS PC — Power Your Next Build
+# Moto Depot — Gear for the Long Way
 
-A responsive PC hardware storefront built with React, Vite, Tailwind CSS, Firebase Authentication, Cloud Firestore, Firebase Storage, and optional callable Cloud Functions. The storefront reads its catalog from Firestore. Customers submit order requests; an authorized admin checks current catalog prices and stock in a Firestore transaction before creating the final order and reserving inventory.
+Moto Depot is a motorcycle accessories storefront built with React, Vite, Tailwind CSS, Firebase Authentication, Cloud Firestore, and Firebase Storage. It includes a responsive catalog, cart, order requests, and an admin approval workflow.
 
-> Product prices and starting stock are demo data in Philippine pesos, not verified live retailer offers. GCash is a manual demo option only: no GCash payment is accepted or processed.
+> Product prices and starting stock are demo data in Philippine pesos, not verified retailer offers. Verify motorcycle fitment and applicable safety standards before buying. GCash is a manual demo option only; no payment is processed.
 
 ## Local setup
 
 1. Install Node.js 22 or newer and the Firebase CLI. The product seed also requires the Google Cloud CLI (`gcloud`).
-2. From the project root, install the storefront dependencies:
+2. Install the storefront and optional Cloud Functions dependencies:
 
    ```sh
    npm install
-   ```
-
-3. Install Cloud Functions dependencies:
-
-   ```sh
    npm --prefix functions install
    ```
 
-4. Copy `.env.example` to `.env.local`. The supplied `.env.local` is already populated for project `nexus-pc-7046b`; it is ignored by Git. Keep it local and restart Vite after changing environment values.
-5. Start the storefront:
+3. Copy `.env.example` to `.env.local`. The local `.env.local` is configured for the Moto Depot Firebase project and is ignored by Git. Keep it local and restart Vite after changing environment values.
+4. Start the storefront and create a production build:
 
    ```sh
    npm run dev
-   ```
-
-6. Make a production build:
-
-   ```sh
    npm run build
    ```
 
-## Firebase configuration
+## Firebase project
 
-The app is configured for the existing Firebase project `nexus-pc-7046b`; it does not create or replace a Firebase project. The browser configuration is read from these Vite variables:
+The app is configured for the existing Firebase project `moto-depot`. The checked-in `.firebaserc` sets it as the Firebase CLI default. The browser configuration is read from:
 
 ```env
 VITE_FIREBASE_API_KEY=
 VITE_FIREBASE_AUTH_DOMAIN=
-VITE_FIREBASE_PROJECT_ID=nexus-pc-7046b
+VITE_FIREBASE_PROJECT_ID=moto-depot
 VITE_FIREBASE_STORAGE_BUCKET=
 VITE_FIREBASE_MESSAGING_SENDER_ID=
 VITE_FIREBASE_APP_ID=
 VITE_FIREBASE_MEASUREMENT_ID=
 ```
 
-In Firebase Console, select **nexus-pc-7046b** and:
+In Firebase Console, select **moto-depot** and enable Email/Password in Authentication, create the production Firestore database, and initialize Storage if product image uploads are needed. Analytics starts only after browser support is confirmed and errors do not prevent the store from loading.
 
-1. Under **Authentication → Sign-in method**, enable **Email/Password**.
-2. Under **Firestore Database**, create the production database in the region you intend to use. Do not enable test mode.
-3. Optional image uploads: open **Storage → Get started** to initialize the existing project's bucket before deploying `storage.rules`. Firebase Storage is not yet initialized for this project.
-4. In **Project settings → General → Your apps**, verify that the supplied web-app configuration matches the existing web app.
-5. (Recommended) Configure Firebase App Check before public production traffic. The callable functions do not require App Check yet.
+## Catalog and seeding
 
-Firebase Analytics starts only after `isSupported()` resolves and is deliberately non-blocking.
+The Firestore `products/{productId}` collection contains the published catalog. The demo catalog has 20 motorcycle products across helmets, riding jackets, gloves, luggage, protection, lighting, maintenance, electronics, and accessories.
 
-## Firestore data and product seeding
-
-The store uses:
-
-- `products/{productId}` — published catalog entries, price in whole PHP, stock, specifications, `soldCount`, and timestamps.
-- `users/{uid}` — customer profile fields only; permissions are not stored here.
-- `carts/{uid}` — the signed-in user's cart item quantities. Guest carts stay in browser local storage.
-- `orderRequests/{requestId}` — customer-submitted product IDs, quantities, delivery details, and approval status. Requests do not set prices or reserve stock.
-- `orders/{orderId}` — admin-approved order snapshots and status history, created with current product prices in the same transaction that reserves inventory.
-- `newsletterSubscribers/{sha256(email)}` — sign-ups received by a callable function. No marketing email is sent.
-
-Create a Google Application Default Credentials session for an account authorized to write to the project's Firestore, then seed the catalog:
+Sign in to Google Cloud with an account authorized to write to the project, then seed products that do not already exist:
 
 ```sh
 gcloud auth application-default login
-gcloud config set project nexus-pc-7046b
+gcloud config set project moto-depot
 npm run seed:products
 ```
 
-The seed script creates the 20 demo catalog documents only when their IDs do not already exist. It skips existing products rather than overwriting price, stock, or product edits. The catalog source is `data/products.json`.
+The seed script skips existing product documents, preserving any existing product edits. The seed data is in `data/products.json`.
 
-## Firestore and Storage rules
+## Orders, access, and rules
 
-Review the rules, then deploy Firestore rules and required indexes:
+Customers submit price-free requests to `orderRequests`. In **Admin → Orders**, approving a request rechecks current product prices and stock in a Firestore transaction, reserves inventory, creates the final `orders` document, and marks the request approved. Customers can follow each ordered item and its current status in their account. Order requests, approvals, and status changes use Firestore rules and transactions; they do not need Cloud Functions.
+
+The Firebase Authentication UID `fJ8DMsDT5KfpU1K7nm0YXvPaQgO2` is the single administrator identity used by the app, Firestore rules, Storage rules, and optional Cloud Functions. Review the rules and deploy them to the new project:
 
 ```sh
 firebase login
-firebase use nexus-pc-7046b
-firebase deploy --only firestore:rules,firestore:indexes
+firebase deploy --only firestore:rules,firestore:indexes,storage
 ```
 
-Public clients can read only published products. Customer profile and cart access is scoped to the signed-in UID. Customers can create an order request only for themselves; requests contain no trusted prices or totals and cannot be changed by customers after submission. Only the signed-in Firebase account with UID `Fwt7JA6ln2cf5BZC4e9kb9GR6yE2` can review requests, create final orders, or change stock. No email verification is required. Changing a Firestore profile document cannot grant access; keep control of this account and use a strong, unique password.
+Storage must be initialized in Firebase Console before deploying its rules. Email verification is not required. Keep control of the administrator account and use a strong, unique password.
 
-After completing **Storage → Get started** in Firebase Console, deploy the optional image-upload rules separately:
-
-```sh
-firebase deploy --only storage
-```
-
-## Order approval and Cloud Functions
-
-Checkout writes a price-free request to `orderRequests/{requestId}`. In **Admin → Orders**, approving a request re-reads each published product and current stock inside a Firestore transaction, calculates prices and shipping from Firestore data, decrements inventory, creates the final `orders/{orderId}` document, and marks the request approved atomically. If stock changed or a product is no longer available, approval fails without creating an order or changing inventory. Rejecting a request does not reserve stock.
-
-The Functions in `functions/src/index.ts` include an optional newsletter callable. Order requests, approvals, and order status changes use Firestore rules and transactions and do not require Cloud Functions.
-
-Cloud Functions deployment requires the Firebase **Blaze** billing plan and enabled Google Cloud APIs. They are not required for order checkout or approval. To deploy optional newsletter functionality:
+Optional Cloud Functions are in `functions/src/index.ts`; deploying them requires the Firebase Blaze plan and enabled Google Cloud APIs:
 
 ```sh
 npm --prefix functions run build
-firebase deploy --only functions --project nexus-pc-7046b
+firebase deploy --only functions
 ```
 
-Approved orders under ₱5,000 have a ₱150 sample shipping fee; orders at or above ₱5,000 have free sample shipping. GCash is a manual demo option only; no payment is processed.
-
-## Administrator access
-
-The Firebase Authentication UID `Fwt7JA6ln2cf5BZC4e9kb9GR6yE2` is the single administrator identity used consistently by Firestore rules, Storage rules, the admin UI, and Cloud Functions. Email verification is not required. Only the authenticated account with this UID receives administrator access; do not store passwords in rules or profiles.
+Orders under ₱5,000 have a ₱150 sample shipping fee; orders at or above ₱5,000 have free sample shipping. The manual GCash demo option does not process payments.
 
 ## Vercel deployment
 
-1. Import this project into Vercel with the repository root as the project root. Firestore rules deployment does not deploy frontend code; redeploy the Vercel app after frontend changes.
-2. Set the build command to `npm run build` and output directory to `dist`.
-3. Add the seven `VITE_FIREBASE_*` variables from `.env.local` to the Vercel project's environment settings. Do not upload `.env.local`.
-4. Deploy Firestore rules and indexes. Initialize Storage in Firebase Console before deploying its optional rules. Upgrade the project to Blaze only if you want to deploy the optional Cloud Functions.
+1. Import the repository into Vercel and set the project root to the repository root.
+2. `vercel.json` configures the Vite production build, `dist` output, and SPA route fallback.
+3. Add all seven `VITE_FIREBASE_*` values from `.env.example` in Vercel's Environment Variables settings for each environment you deploy. These browser Firebase config values are public; enforce access through Firebase Security Rules. Do not upload `.env.local` or service-account credentials.
+4. Deploy Firestore rules and indexes separately with the Firebase CLI. Optional Cloud Functions also deploy separately to Firebase; Vercel hosts the storefront and does not deploy the `functions` directory.
 
-`vercel.json` rewrites application routes to the Vite SPA entry point. Firestore rules and the authenticated administrator UID gate order approvals and stock changes.
+`vercel.json` rewrites application routes to the Vite SPA entry point.

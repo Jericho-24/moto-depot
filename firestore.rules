@@ -8,7 +8,7 @@ service cloud.firestore {
 
     function isAdmin() {
       return signedIn()
-        && request.auth.uid == 'Fwt7JA6ln2cf5BZC4e9kb9GR6yE2';
+        && request.auth.uid == 'fJ8DMsDT5KfpU1K7nm0YXvPaQgO2';
     }
 
     match /products/{productId} {

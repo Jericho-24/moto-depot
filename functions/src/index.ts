@@ -20,7 +20,7 @@ const ORDER_STATUSES = [
   "Cancelled",
 ] as const;
 type OrderStatus = (typeof ORDER_STATUSES)[number];
-const ADMIN_UID = "Fwt7JA6ln2cf5BZC4e9kb9GR6yE2";
+const ADMIN_UID = "fJ8DMsDT5KfpU1K7nm0YXvPaQgO2";
 
 function isAdmin(request: {
   auth?: { uid: string; token: Record<string, unknown> } | null;

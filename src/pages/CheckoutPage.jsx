@@ -79,7 +79,7 @@ export default function CheckoutPage() {
   return (
     <div className="container page-wrap">
       <div className="checkout-top"><Link to="/cart"><ArrowLeft size={15} /> Back to cart</Link><span><LockKeyhole size={14} /> SECURE CHECKOUT</span></div>
-      <div className="page-title"><span className="eyebrow">ONE LAST STEP</span><h1>Make it yours.</h1><p>Delivery details for your next setup.</p></div>
+      <div className="page-title"><span className="eyebrow">ONE LAST STEP</span><h1>Get set to ride.</h1><p>Where should we send your motorcycle gear?</p></div>
       <form className="checkout-layout" onSubmit={submit}>
         <div className="checkout-form">
           <section className="checkout-card">

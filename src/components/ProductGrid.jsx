@@ -5,6 +5,7 @@ export default function ProductGrid({
   products,
   loading,
   error,
+  notice = "",
   compact = false,
   emptyTitle = "No products are available yet",
   emptyMessage = "The catalog is being set up. Please check back soon.",
@@ -15,8 +16,11 @@ export default function ProductGrid({
     return <EmptyState title={emptyTitle} message={emptyMessage} />;
   }
   return (
-    <div className="product-grid">
-      {products.map((product) => <ProductCard key={product.id} product={product} compact={compact} />)}
-    </div>
+    <>
+      {notice && <div className="catalog-notice" role="status">{notice}</div>}
+      <div className="product-grid">
+        {products.map((product) => <ProductCard key={product.id} product={product} compact={compact} />)}
+      </div>
+    </>
   );
 }

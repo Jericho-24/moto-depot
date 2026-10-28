@@ -20,12 +20,12 @@ export default function ProductCard({ product, compact = false }) {
     <article className={`product-card ${compact ? "product-card-compact" : ""}`}>
       <Link to={`/product/${product.slug}`} className="product-card-image group">
         {product.featured && <span className="product-badge">FEATURED</span>}
-        <ProductImage src={product.image} alt={product.name} className="transition duration-500 group-hover:scale-105" />
+        <ProductImage id={product.id} src={product.image} alt={product.name} className="transition duration-500 group-hover:scale-105" />
         <span className="product-quick-view"><ArrowUpRight size={17} /> View details</span>
       </Link>
       <div className="product-card-body">
         <div className="flex items-center justify-between gap-2">
-          <span className="eyebrow">{product.brand}</span>
+          <span className="eyebrow">{product.brand} · {product.category}</span>
           <span className="stock-tag">{product.stock > 0 ? "In stock" : "Sold out"}</span>
         </div>
         <Link to={`/product/${product.slug}`} className="product-title line-clamp-2">{product.name}</Link>

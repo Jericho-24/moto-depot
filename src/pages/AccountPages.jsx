@@ -62,7 +62,7 @@ export function AccountPage() {
 
   return (
     <div className="container page-wrap account-page">
-      <div className="page-title"><span className="eyebrow">PERSONAL ACCOUNT</span><h1>Your account.</h1><p>Manage your profile and keep an eye on your build.</p></div>
+      <div className="page-title"><span className="eyebrow">RIDER ACCOUNT</span><h1>Your account.</h1><p>Manage your profile and keep an eye on your orders.</p></div>
       <div className="account-layout">
         <aside className="account-nav"><div className="account-avatar"><CircleUserRound size={27} /></div><b>{profile?.name || user?.displayName || "Builder"}</b><span>{user?.email}</span><div className="account-nav-label">YOUR ACCOUNT</div><Link className="account-nav-link active" to="/account"><CircleUserRound size={16} /> Profile</Link><Link className="account-nav-link" to="/account/orders"><Package size={16} /> My orders</Link>{isAdmin && <div className="account-admin-area"><span><ShieldCheck size={14} /> STORE ADMIN</span><Link className="account-nav-link account-admin-link" to="/admin">Open admin console <ArrowRight size={14} /></Link></div>}<button className="account-nav-link account-signout" onClick={async () => { await logout(); navigate("/"); }}><LogOut size={16} /> Sign out</button></aside>
         <div className="account-content"><section className="account-card"><div className="account-card-head"><span className="eyebrow">PROFILE DETAILS</span><BadgeCheck size={19} /></div><h2>About you</h2><p>Keep your contact details up to date for smoother checkout.</p>{error && <div className="form-alert">{error}</div>}{notice && <div className="form-success">{notice}</div>}
@@ -122,7 +122,7 @@ export function OrderHistoryPage() {
   return (
     <div className="container page-wrap">
       <div className="page-title"><span className="eyebrow">LIVE ORDER TRACKING</span><h1>Track your orders.</h1><p>See each item you requested and its current approval or delivery status.</p></div>
-      {loading ? <LoadingState label="Loading your orders..." /> : error ? <ErrorState message={error} /> : !orders.length ? <EmptyState title="No orders yet" message="Your next build starts whenever you're ready." /> : (
+      {loading ? <LoadingState label="Loading your orders..." /> : error ? <ErrorState message={error} /> : !orders.length ? <EmptyState title="No orders yet" message="Your next ride essential is waiting in the shop." /> : (
         <div className="order-tracking-list">{orders.map((order) => {
           const items = Array.isArray(order.items) ? order.items : [];
           const detailPath = order.isRequest

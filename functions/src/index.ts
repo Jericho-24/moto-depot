@@ -137,7 +137,6 @@ export const createOrder = onCall(async (request) => {
     productRefs.forEach((ref, index) => {
       transaction.update(ref, {
         stock: snapshots[index].data()!.stock - items[index].quantity,
-        soldCount: FieldValue.increment(items[index].quantity),
         updatedAt: FieldValue.serverTimestamp(),
       });
     });
@@ -200,7 +199,7 @@ export const updateOrderStatus = onCall(async (request) => {
     }
 
     const orderItems = Array.isArray(order.items) ? order.items : [];
-    if (status === "Cancelled") {
+    if (status === "Cancelled" || status === "Delivered") {
       const refs = orderItems.map((item: { productId: string }) =>
         db.collection("products").doc(item.productId));
       const productSnapshots: DocumentSnapshot[] = [];
@@ -210,12 +209,15 @@ export const updateOrderStatus = onCall(async (request) => {
       refs.forEach((ref, index) => {
         const quantity = Number(orderItems[index].quantity);
         if (productSnapshots[index].exists && Number.isInteger(quantity) && quantity > 0) {
-          const currentSold = Number(productSnapshots[index].data()?.soldCount) || 0;
-          transaction.update(ref, {
-            stock: FieldValue.increment(quantity),
-            soldCount: Math.max(0, currentSold - quantity),
-            updatedAt: FieldValue.serverTimestamp(),
-          });
+          transaction.update(ref, status === "Cancelled"
+            ? {
+              stock: FieldValue.increment(quantity),
+              updatedAt: FieldValue.serverTimestamp(),
+            }
+            : {
+              soldCount: FieldValue.increment(quantity),
+              updatedAt: FieldValue.serverTimestamp(),
+            });
         }
       });
     }
